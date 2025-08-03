@@ -50,3 +50,13 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Others
+*.log
+*.tmp
+*.user
+*.suo
+.vs/
+bin/
+obj/
+build/
