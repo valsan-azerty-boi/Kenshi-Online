@@ -1552,27 +1552,27 @@ namespace KenshiMultiplayer
                 return new Dictionary<string, object>
                 {
                     { "success", true },
-                    { "mods", new List<Dictionary<string, object>>
-                        {
-                            new()
-                            {
-                                { "name", "Reactive World" },
-                                { "enabled", true },
-                                { "path", "mods/reactive_world" }
-                            },
-                            new()
-                            {
-                                { "name", "Kaizo" },
-                                { "enabled", true },
-                                { "path", "mods/kaizo" }
-                            },
-                            new()
-                            {
-                                { "name", "Dark UI" },
-                                { "enabled", true },
-                                { "path", "mods/dark_ui" }
-                            }
-                        }
+                    { "mods", new List<Dictionary<string, object>>()
+                        //{
+                        //    new()
+                        //    {
+                        //        { "name", "Reactive World" },
+                        //        { "enabled", true },
+                        //        { "path", "mods/reactive_world" }
+                        //    },
+                        //    new()
+                        //    {
+                        //        { "name", "Kaizo" },
+                        //        { "enabled", true },
+                        //        { "path", "mods/kaizo" }
+                        //    },
+                        //    new()
+                        //    {
+                        //        { "name", "Dark UI" },
+                        //        { "enabled", true },
+                        //        { "path", "mods/dark_ui" }
+                        //    }
+                        //}
                     }
                 };
             }
