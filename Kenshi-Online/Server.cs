@@ -49,8 +49,8 @@ namespace KenshiMultiplayer
         {
             NetworkStream stream = client.GetStream();
             byte[] buffer = new byte[16384]; // Larger buffer for file transfers
-            string authenticatedUser = null;
-            string authToken = null;
+            string? authenticatedUser = null;
+            string? authToken = null;
 
             try
             {
@@ -80,7 +80,7 @@ namespace KenshiMultiplayer
                         // Handle file requests
                         else if (message.Type == "file_request")
                         {
-                            if (ValidateAuthToken(message.SessionId, out string username))
+                            if (ValidateAuthToken(message.SessionId, out var username) && !string.IsNullOrEmpty(username))
                             {
                                 HandleFileRequest(message, client);
                                 authenticatedUser = username;
@@ -93,7 +93,7 @@ namespace KenshiMultiplayer
                         }
                         else if (message.Type == "file_list_request")
                         {
-                            if (ValidateAuthToken(message.SessionId, out string username))
+                            if (ValidateAuthToken(message.SessionId, out var username) && !string.IsNullOrEmpty(username))
                             {
                                 HandleFileListRequest(message, client);
                                 authenticatedUser = username;
@@ -105,7 +105,7 @@ namespace KenshiMultiplayer
                             }
                         }
                         // Handle other message types
-                        else if (ValidateAuthToken(message.SessionId, out string username))
+                        else if (ValidateAuthToken(message.SessionId, out var username) && !string.IsNullOrEmpty(username))
                         {
                             authenticatedUser = username;
                             authToken = message.SessionId;
@@ -163,55 +163,62 @@ namespace KenshiMultiplayer
 
         private void HandleLogin(GameMessage message, TcpClient client)
         {
-            string username = message.Data["username"].ToString();
-            string password = message.Data["password"].ToString();
+            var username = message.Data["username"].ToString();
+            var password = message.Data["password"].ToString();
 
-            var (success, sessionId, errorMessage) = UserManager.Login(username, password);
-
-            if (success)
-            {
-                // Generate JWT token
-                string token = AuthManager.GenerateJWT(username);
-
-                // Store active session
-                activeUserSessions[token] = username;
-
-                var response = new GameMessage
-                {
-                    Type = MessageType.Authentication,
-                    Data = new Dictionary<string, object>
-                    {
-                        { "success", true },
-                        { "token", token },
-                        { "username", username }
-                    }
-                };
-
-                SendMessageToClient(client, response.ToJson());
-                Logger.Log($"User {username} authenticated successfully");
-            }
+            if (string.IsNullOrEmpty(username))
+                Logger.Log("Authentication failed for a user trying to log in without entering a username");
+            else if (string.IsNullOrEmpty(password))
+                Logger.Log($"Authentication failed for a user who entered the username {username} and tried to log in without entering a password");
             else
             {
-                var response = new GameMessage
-                {
-                    Type = MessageType.Authentication,
-                    Data = new Dictionary<string, object>
-                    {
-                        { "success", false },
-                        { "error", errorMessage }
-                    }
-                };
+                var (success, sessionId, errorMessage) = UserManager.Login(username, password);
 
-                SendMessageToClient(client, response.ToJson());
-                Logger.Log($"Authentication failed for {username}: {errorMessage}");
+                if (success)
+                {
+                    // Generate JWT token
+                    string token = AuthManager.GenerateJWT(username);
+
+                    // Store active session
+                    activeUserSessions[token] = username;
+
+                    var response = new GameMessage
+                    {
+                        Type = MessageType.Authentication,
+                        Data = new Dictionary<string, object>
+                        {
+                            { "success", true },
+                            { "token", token },
+                            { "username", username }
+                        }
+                    };
+
+                    SendMessageToClient(client, response.ToJson());
+                    Logger.Log($"User {username} authenticated successfully");
+                }
+                else
+                {
+                    var response = new GameMessage
+                    {
+                        Type = MessageType.Authentication,
+                        Data = new Dictionary<string, object>
+                        {
+                            { "success", false },
+                            { "error", errorMessage }
+                        }
+                    };
+
+                    SendMessageToClient(client, response.ToJson());
+                    Logger.Log($"Authentication failed for {username}: {errorMessage}");
+                }
             }
         }
 
         private void HandleRegistration(GameMessage message, TcpClient client)
         {
-            string username = message.Data["username"].ToString();
-            string password = message.Data["password"].ToString();
-            string email = message.Data["email"].ToString();
+            var username = message.Data["username"].ToString() ?? string.Empty;
+            var password = message.Data["password"].ToString() ?? string.Empty;
+            var email = message.Data["email"].ToString() ?? string.Empty;
 
             var (success, errorMessage) = UserManager.RegisterUser(username, password, email);
 
@@ -221,7 +228,7 @@ namespace KenshiMultiplayer
                 Data = new Dictionary<string, object>
                 {
                     { "success", success },
-                    { "error", errorMessage ?? "" }
+                    { "error", errorMessage }
                 }
             };
 
@@ -239,27 +246,32 @@ namespace KenshiMultiplayer
 
         private void HandleFileRequest(GameMessage message, TcpClient client)
         {
-            string relativePath = message.Data["path"].ToString();
+            var relativePath = message.Data["path"].ToString();
 
             try
             {
-                // Get file data
-                byte[] fileData = fileManager.GetFileData(relativePath);
-                GameFileInfo fileInfo = fileManager.GetFileInfo(relativePath);
-
-                // Create response
-                var response = new GameMessage
+                if (string.IsNullOrEmpty(relativePath))
+                    Logger.Log("Send file impossible, relativePath is null or empty (HandleFileRequest)");
+                else
                 {
-                    Type = "file_data",
-                    Data = new Dictionary<string, object>
-                    {
-                        { "data", Convert.ToBase64String(fileData) },
-                        { "fileInfo", JsonSerializer.Serialize(fileInfo) }
-                    }
-                };
+                    // Get file data
+                    byte[] fileData = fileManager.GetFileData(relativePath);
+                    GameFileInfo fileInfo = fileManager.GetFileInfo(relativePath);
 
-                SendMessageToClient(client, response.ToJson());
-                Logger.Log($"Sent file {relativePath} ({fileData.Length} bytes)");
+                    // Create response
+                    var response = new GameMessage
+                    {
+                        Type = "file_data",
+                        Data = new Dictionary<string, object>
+                        {
+                            { "data", Convert.ToBase64String(fileData) },
+                            { "fileInfo", JsonSerializer.Serialize(fileInfo) }
+                        }
+                    };
+
+                    SendMessageToClient(client, response.ToJson());
+                    Logger.Log($"Sent file {relativePath} ({fileData.Length} bytes)");
+                }
             }
             catch (Exception ex)
             {
@@ -269,26 +281,31 @@ namespace KenshiMultiplayer
 
         private void HandleFileListRequest(GameMessage message, TcpClient client)
         {
-            string directory = message.Data.ContainsKey("directory")
+            var directory = message.Data.ContainsKey("directory")
                 ? message.Data["directory"].ToString()
                 : "";
 
             try
             {
-                List<GameFileInfo> files = fileManager.GetDirectoryContents(directory);
-
-                var response = new GameMessage
+                if (string.IsNullOrEmpty(directory))
+                    Logger.Log("Send file list impossible, directory is null or empty (HandleFileListRequest)");
+                else
                 {
-                    Type = "file_list",
-                    Data = new Dictionary<string, object>
-                    {
-                        { "files", JsonSerializer.Serialize(files) },
-                        { "directory", directory }
-                    }
-                };
+                    List<GameFileInfo> files = fileManager.GetDirectoryContents(directory);
 
-                SendMessageToClient(client, response.ToJson());
-                Logger.Log($"Sent file list for {directory} ({files.Count} files)");
+                    var response = new GameMessage
+                    {
+                        Type = "file_list",
+                        Data = new Dictionary<string, object>
+                        {
+                            { "files", JsonSerializer.Serialize(files) },
+                            { "directory", directory }
+                        }
+                    };
+
+                    SendMessageToClient(client, response.ToJson());
+                    Logger.Log($"Sent file list for {directory} ({files.Count} files)");
+                }
             }
             catch (Exception ex)
             {
@@ -296,24 +313,28 @@ namespace KenshiMultiplayer
             }
         }
 
-        private bool ValidateAuthToken(string token, out string username)
+        private bool ValidateAuthToken(string token, out string? username)
         {
+            bool result = false;
             username = null;
 
             if (string.IsNullOrEmpty(token))
-                return false;
+                return result;
 
             if (activeUserSessions.TryGetValue(token, out username))
-                return true;
+                result = true;
 
             if (AuthManager.ValidateJWT(token, out username))
             {
                 // If valid but not in active sessions, add it
                 activeUserSessions[token] = username;
-                return true;
+                result = true;
             }
 
-            return false;
+            if (string.IsNullOrEmpty(username))
+                result = false;
+
+            return result;
         }
 
         private void BroadcastMessage(string jsonMessage, TcpClient senderClient)
@@ -385,33 +406,50 @@ namespace KenshiMultiplayer
         private void HandleChatMessage(GameMessage message, TcpClient senderClient)
         {
             // Extract user info from token
-            string username = null;
-            ValidateAuthToken(message.SessionId, out username);
-
-            if (message.LobbyId != null && lobbies.TryGetValue(message.LobbyId, out var lobby))
+            ValidateAuthToken(message.SessionId, out var username);
+            
+            if (string.IsNullOrEmpty(username))
+                Logger.Log($"Chat error: an invalid user tried to send a message");
+            else if (message.LobbyId != null && lobbies.TryGetValue(message.LobbyId, out var lobby))
             {
-                string channel = message.Data.ContainsKey("channel") ? message.Data["channel"].ToString() : "general";
-                string chatMessage = message.Data.ContainsKey("message") ? message.Data["message"].ToString() : string.Empty;
-                lobby.BroadcastToChannel(channel, $"[{username}]: {chatMessage}", senderClient);
-                Logger.Log($"Chat in lobby {message.LobbyId}, channel {channel}: {username}: {chatMessage}");
+                var channel = message.Data.ContainsKey("channel") ? message.Data["channel"].ToString() : "general";
+                var chatMessage = message.Data.ContainsKey("message") ? message.Data["message"].ToString() : string.Empty;
+                if (string.IsNullOrEmpty(channel))
+                {
+                    Logger.Log($"Chat error: {username} send in a null channel");
+                }
+                else if(string.IsNullOrEmpty(chatMessage))
+                {
+                    Logger.Log($"Chat error: {username} tried to send an invalid message");
+                }
+                else
+                {
+                    lobby.BroadcastToChannel(channel, $"[{username}]: {chatMessage}", senderClient);
+                    Logger.Log($"Chat in lobby {message.LobbyId}, channel {channel}: {username}: {chatMessage}");
+                }
             }
             else
             {
                 // Global chat
-                string chatMessage = message.Data.ContainsKey("message") ? message.Data["message"].ToString() : string.Empty;
+                var chatMessage = message.Data.ContainsKey("message") ? message.Data["message"].ToString() : string.Empty;
 
-                var broadcastMessage = new GameMessage
+                if (string.IsNullOrEmpty(chatMessage))
+                    Logger.Log($"Chat error: {username} tried to send an invalid message");
+                else
                 {
-                    Type = MessageType.Chat,
-                    PlayerId = username,
-                    Data = new Dictionary<string, object>
+                    var broadcastMessage = new GameMessage
                     {
-                        { "message", chatMessage }
-                    }
-                };
+                        Type = MessageType.Chat,
+                        PlayerId = username,
+                        Data = new Dictionary<string, object>
+                        {
+                            { "message", chatMessage }
+                        }
+                    };
 
-                BroadcastMessage(broadcastMessage.ToJson(), senderClient);
-                Logger.Log($"Global chat: {username}: {chatMessage}");
+                    BroadcastMessage(broadcastMessage.ToJson(), senderClient);
+                    Logger.Log($"Global chat: {username}: {chatMessage}");
+                }
             }
         }
 
@@ -421,7 +459,7 @@ namespace KenshiMultiplayer
             {
                 try
                 {
-                    string command = Console.ReadLine();
+                    var command = Console.ReadLine();
                     if (string.IsNullOrEmpty(command))
                         continue;
 
@@ -512,7 +550,7 @@ namespace KenshiMultiplayer
         private void KickPlayer(string username)
         {
             // Find user's auth token
-            string tokenToRemove = null;
+            string? tokenToRemove = null;
             foreach (var kvp in activeUserSessions)
             {
                 if (kvp.Value == username)

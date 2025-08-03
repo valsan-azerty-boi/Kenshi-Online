@@ -27,7 +27,8 @@ namespace KenshiMultiplayer
             if (File.Exists(userFilePath))
             {
                 var json = File.ReadAllText(userFilePath);
-                users = JsonSerializer.Deserialize<Dictionary<string, UserAccount>>(json);
+                users = JsonSerializer.Deserialize<Dictionary<string, UserAccount>>(json) ??
+                        new Dictionary<string, UserAccount>();
             }
             else
             {
@@ -40,7 +41,8 @@ namespace KenshiMultiplayer
             if (File.Exists(dataFilePath))
             {
                 var json = File.ReadAllText(dataFilePath);
-                playerData = JsonSerializer.Deserialize<Dictionary<string, PlayerData>>(json);
+                playerData = JsonSerializer.Deserialize<Dictionary<string, PlayerData>>(json) ??
+                             new Dictionary<string, PlayerData>();
             }
         }
 
@@ -49,7 +51,8 @@ namespace KenshiMultiplayer
             if (File.Exists(sessionFilePath))
             {
                 var json = File.ReadAllText(sessionFilePath);
-                activeSessions = JsonSerializer.Deserialize<Dictionary<string, UserSession>>(json);
+                activeSessions = JsonSerializer.Deserialize<Dictionary<string, UserSession>>(json) ??
+                                 new Dictionary<string, UserSession>();
 
                 // Clean up expired sessions
                 var expiredSessions = activeSessions
@@ -74,7 +77,7 @@ namespace KenshiMultiplayer
         {
             if (!users.TryGetValue(username, out var account))
             {
-                return (false, null, "User not found");
+                return (false, string.Empty, "User not found");
             }
 
             if (account.IsBanned)
@@ -91,13 +94,13 @@ namespace KenshiMultiplayer
                     string banMessage = account.BanExpiration.HasValue
                         ? $"Account banned until {account.BanExpiration.Value}"
                         : "Account permanently banned";
-                    return (false, null, banMessage);
+                    return (false, string.Empty, banMessage);
                 }
             }
 
             if (!EncryptionHelper.VerifyPassword(password, account.PasswordHash, account.Salt))
             {
-                return (false, null, "Invalid password");
+                return (false, string.Empty, "Invalid password");
             }
 
             // Create a new session
@@ -119,7 +122,7 @@ namespace KenshiMultiplayer
             account.LastLogin = DateTime.UtcNow;
             SaveUsers();
 
-            return (true, sessionId, null);
+            return (true, sessionId, string.Empty);
         }
 
         public static bool ValidateSession(string sessionId)
@@ -183,7 +186,7 @@ namespace KenshiMultiplayer
             };
 
             SaveUsers();
-            return (true, null);
+            return (true, string.Empty);
         }
 
         public static bool IsAdmin(string username)

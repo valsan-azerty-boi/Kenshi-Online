@@ -701,11 +701,16 @@ namespace KenshiMultiplayer
             if (message.Data.TryGetValue("tradeId", out var tradeIdObj) &&
                 message.Data.TryGetValue("trade", out var tradeObj))
             {
-                string tradeId = tradeIdObj.ToString();
+                var tradeId = tradeIdObj.ToString();
                 var trade = JsonSerializer.Deserialize<TradeSession>(tradeObj.ToString());
 
                 // Add to active trades
-                activeTrades[tradeId] = trade;
+                if (string.IsNullOrEmpty(tradeId))
+                    Logger.Log($"Error loading trade data: {nameof(tradeId)} is missing (HandleTradeRequest)");
+                else if (trade is null)
+                    Logger.Log($"Error loading trade data: {nameof(trade)} is null (HandleTradeUpdate)");
+                else
+                    activeTrades[tradeId] = trade;
 
                 SaveData();
             }
@@ -715,9 +720,11 @@ namespace KenshiMultiplayer
         {
             if (message.Data.TryGetValue("tradeId", out var tradeIdObj))
             {
-                string tradeId = tradeIdObj.ToString();
+                var tradeId = tradeIdObj.ToString();
 
-                if (activeTrades.TryGetValue(tradeId, out var trade))
+                if (string.IsNullOrEmpty(tradeId))
+                    Logger.Log($"Error loading trade data: {nameof(tradeId)} is missing (HandleTradeAccept)");
+                else if (activeTrades.TryGetValue(tradeId, out var trade))
                 {
                     // Update status
                     trade.Status = TradeStatus.InProgress;
@@ -738,10 +745,13 @@ namespace KenshiMultiplayer
         {
             if (message.Data.TryGetValue("tradeId", out var tradeIdObj))
             {
-                string tradeId = tradeIdObj.ToString();
+                var tradeId = tradeIdObj.ToString();
 
-                // Remove from active trades
-                activeTrades.Remove(tradeId);
+                if (string.IsNullOrEmpty(tradeId))
+                    Logger.Log($"Error loading trade data: {nameof(tradeId)} is missing (HandleTradeDecline)");
+                else
+                    // Remove from active trades
+                    activeTrades.Remove(tradeId);
 
                 SaveData();
             }
@@ -752,15 +762,19 @@ namespace KenshiMultiplayer
             if (message.Data.TryGetValue("tradeId", out var tradeIdObj) &&
                 message.Data.TryGetValue("trade", out var tradeObj))
             {
-                string tradeId = tradeIdObj.ToString();
+                var tradeId = tradeIdObj.ToString();
                 var trade = JsonSerializer.Deserialize<TradeSession>(tradeObj.ToString());
 
                 // Update the trade
-                activeTrades[tradeId] = trade;
-
-                // Update current trade if we're in this one
-                if (currentTrade != null && currentTrade.Id == tradeId)
+                if (string.IsNullOrEmpty(tradeId))
+                    Logger.Log($"Error loading trade data: {nameof(tradeId)} is missing (HandleTradeUpdate)");
+                else if (trade is null)
+                    Logger.Log($"Error loading trade data: {nameof(trade)} is null (HandleTradeUpdate)");
+                else
                 {
+                    activeTrades[tradeId] = trade;
+
+                    // Update current trade if we're in this one
                     currentTrade = trade;
                 }
 
@@ -772,9 +786,11 @@ namespace KenshiMultiplayer
         {
             if (message.Data.TryGetValue("tradeId", out var tradeIdObj))
             {
-                string tradeId = tradeIdObj.ToString();
-
-                CancelTradeLocally(tradeId);
+                var tradeId = tradeIdObj.ToString();
+                if (string.IsNullOrEmpty(tradeId))
+                    Logger.Log($"Error loading trade data: {nameof(tradeId)} is missing (HandleTradeCancel)");
+                else
+                    CancelTradeLocally(tradeId);
             }
         }
 
@@ -782,9 +798,11 @@ namespace KenshiMultiplayer
         {
             if (message.Data.TryGetValue("tradeId", out var tradeIdObj))
             {
-                string tradeId = tradeIdObj.ToString();
-
-                CompleteTradeLocally(tradeId);
+                var tradeId = tradeIdObj.ToString();
+                if (string.IsNullOrEmpty(tradeId))
+                    Logger.Log($"Error loading trade data: {nameof(tradeId)} is missing (HandleTradeComplete)");
+                else
+                    CompleteTradeLocally(tradeId);
             }
         }
     }
