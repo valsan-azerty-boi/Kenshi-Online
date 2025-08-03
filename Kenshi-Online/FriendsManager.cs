@@ -487,7 +487,7 @@ namespace KenshiMultiplayer
         private void HandleFriendStatusUpdate(GameMessage message)
         {
             string username = message.PlayerId;
-            bool isOnline = (bool)message.Data["isOnline"];
+            var isOnline = (bool)message.Data["isOnline"]; //((JsonElement)message.Data["isOnline"]).GetBoolean();
 
             if (friends.TryGetValue(username, out var friend))
             {

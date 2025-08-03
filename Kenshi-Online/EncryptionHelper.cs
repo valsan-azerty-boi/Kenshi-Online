@@ -26,8 +26,13 @@ namespace KenshiMultiplayer
                 try
                 {
                     var config = System.Text.Json.JsonSerializer.Deserialize<EncryptionConfig>(File.ReadAllText(configFilePath));
-                    encryptionKey = config.Key;
-                    initVector = Convert.FromBase64String(config.IV);
+                    if(config is null || string.IsNullOrEmpty(config.Key) || string.IsNullOrEmpty(config.IV))
+                        Logger.Log("Error loading encryption config: config is null or his Key / IV values are empty.");
+                    else
+                    {
+                        encryptionKey = config.Key;
+                        initVector = Convert.FromBase64String(config.IV);
+                    }
                     return;
                 }
                 catch (Exception ex)
@@ -74,7 +79,8 @@ namespace KenshiMultiplayer
             {
                 using (Aes aes = Aes.Create())
                 {
-                    aes.Key = Encoding.UTF8.GetBytes(encryptionKey);
+                    //aes.Key = Encoding.UTF8.GetBytes(encryptionKey);
+                    aes.Key = Convert.FromBase64String(encryptionKey);
                     aes.IV = initVector;
                     aes.Mode = CipherMode.CBC;
                     aes.Padding = PaddingMode.PKCS7;
@@ -109,7 +115,8 @@ namespace KenshiMultiplayer
 
                 using (Aes aes = Aes.Create())
                 {
-                    aes.Key = Encoding.UTF8.GetBytes(encryptionKey);
+                    aes.Key = Convert.FromBase64String(encryptionKey);
+                    //aes.Key = Encoding.UTF8.GetBytes(encryptionKey);
                     aes.IV = initVector;
                     aes.Mode = CipherMode.CBC;
                     aes.Padding = PaddingMode.PKCS7;

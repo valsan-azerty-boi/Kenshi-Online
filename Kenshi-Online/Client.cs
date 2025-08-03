@@ -75,18 +75,19 @@ namespace KenshiMultiplayer
                 SendMessageToServer(loginMessage);
 
                 // Wait for response
-                GameMessage response = ReceiveMessageFromServer();
+                var response = ReceiveMessageFromServer();
 
                 if (response.Type == MessageType.Authentication &&
                     response.Data.ContainsKey("success") &&
-                    (bool)response.Data["success"] &&
+                    ((JsonElement)response.Data["success"]).GetBoolean() && //(bool)response.Data["success"] &&
                     response.Data.ContainsKey("token"))
                 {
-                    authToken = response.Data["token"].ToString();
+                    authToken = response.Data["token"].ToString() ?? string.Empty;
+                    if (string.IsNullOrEmpty(authToken))
+                        return false;
 
                     // Start listener thread
-                    Thread readThread = new Thread(ListenForServerMessages);
-                    readThread.IsBackground = true;
+                    var readThread = new Thread(ListenForServerMessages) { IsBackground = true };
                     readThread.Start();
 
                     return true;
@@ -121,11 +122,11 @@ namespace KenshiMultiplayer
 
                 SendMessageToServer(registerMessage);
 
-                GameMessage response = ReceiveMessageFromServer();
+                var response = ReceiveMessageFromServer();
 
                 if (response.Type == MessageType.Authentication &&
                     response.Data.ContainsKey("success") &&
-                    (bool)response.Data["success"])
+                    ((JsonElement)response.Data["success"]).GetBoolean()) //(bool)response.Data["success"])
                 {
                     // Registration successful
                     return true;
@@ -146,7 +147,7 @@ namespace KenshiMultiplayer
             {
                 try
                 {
-                    string webRootPath = Path.Combine(localCachePath, "webui");
+                    var webRootPath = Path.Combine(localCachePath, "webui");
                     webUI = new WebUIController(webRootPath, port);
                     webUI.SetClient(this);
                     webUI.Start();
@@ -213,7 +214,7 @@ namespace KenshiMultiplayer
         public byte[] RequestGameFile(string relativePath)
         {
             // Check if we already have this file cached
-            string cachePath = Path.Combine(localCachePath, relativePath);
+            var cachePath = Path.Combine(localCachePath, relativePath);
 
             if (File.Exists(cachePath) && cachedFileInfo.TryGetValue(relativePath, out var fileInfo))
             {
@@ -236,13 +237,13 @@ namespace KenshiMultiplayer
 
             // Wait for response
             // In a real implementation, this would be asynchronous with callbacks
-            GameMessage response = null;
+            GameMessage? response = null;
 
             // Create a signal to wait for the response
             var responseSignal = new ManualResetEvent(false);
 
             // Event handler to capture the response
-            EventHandler<GameMessage> responseHandler = null;
+            EventHandler<GameMessage>? responseHandler = null;
             responseHandler = (sender, msg) => {
                 if (msg.Type == "file_data")
                 {
@@ -456,19 +457,21 @@ namespace KenshiMultiplayer
 
         private GameMessage ReceiveMessageFromServer()
         {
-            byte[] buffer = new byte[8192];
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-            string encryptedMessage = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-            string jsonMessage = EncryptionHelper.Decrypt(encryptedMessage);
+            var buffer = new byte[8192];
+            var bytesRead = stream.Read(buffer, 0, buffer.Length);
+            //string encryptedMessage = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+            var encryptedMessage = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            var jsonMessage = EncryptionHelper.Decrypt(encryptedMessage);
             return GameMessage.FromJson(jsonMessage);
         }
 
         // Changed from 'private' to 'internal' to allow access from other classes in the same assembly
         internal void SendMessageToServer(GameMessage message)
         {
-            string jsonMessage = message.ToJson();
-            string encryptedMessage = EncryptionHelper.Encrypt(jsonMessage);
-            byte[] messageBuffer = Encoding.ASCII.GetBytes(encryptedMessage);
+            var jsonMessage = message.ToJson();
+            var encryptedMessage = EncryptionHelper.Encrypt(jsonMessage);
+            //byte[] messageBuffer = Encoding.ASCII.GetBytes(encryptedMessage);
+            var messageBuffer = Encoding.UTF8.GetBytes(encryptedMessage);
             stream.Write(messageBuffer, 0, messageBuffer.Length);
         }
 

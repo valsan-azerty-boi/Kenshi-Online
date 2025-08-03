@@ -38,7 +38,7 @@ namespace KenshiMultiplayer
             InitializeApiEndpoints();
 
             // Extract embedded web files or create default ones
-            ExtractEmbeddedWebUI();
+            ExtractEmbeddedWebUi();
 
             Logger.Log("WebUI extracted/created successfully");
         }
@@ -114,8 +114,7 @@ namespace KenshiMultiplayer
                 listener.Start();
                 isRunning = true;
 
-                listenerThread = new Thread(ListenerLoop);
-                listenerThread.IsBackground = true;
+                listenerThread = new Thread(ListenerLoop) { IsBackground = true };
                 listenerThread.Start();
 
                 Logger.Log("WebUI started successfully");
@@ -137,7 +136,7 @@ namespace KenshiMultiplayer
                 isRunning = false;
                 listener.Stop();
 
-                if (listenerThread != null && listenerThread.IsAlive)
+                if (listenerThread is { IsAlive: true })
                 {
                     listenerThread.Join(1000);
                 }
@@ -210,7 +209,7 @@ namespace KenshiMultiplayer
                 }
 
                 // Serve static files
-                string filePath = Path.Combine(webRoot, path.TrimStart('/'));
+                var filePath = Path.Combine(webRoot, path.TrimStart('/'));
 
                 // Default to index.html for root path
                 if (path == "/" || string.IsNullOrEmpty(path))
@@ -227,7 +226,7 @@ namespace KenshiMultiplayer
                     // Try serving index.html for client-side routing
                     if (!path.Contains("."))
                     {
-                        string indexPath = Path.Combine(webRoot, "index.html");
+                        var indexPath = Path.Combine(webRoot, "index.html");
                         if (File.Exists(indexPath))
                         {
                             ServeFile(context, indexPath);
@@ -253,10 +252,10 @@ namespace KenshiMultiplayer
             }
         }
 
-        private bool RequiresAuthentication(string path)
+        private static bool RequiresAuthentication(string path)
         {
             // List of endpoints that don't require authentication
-            string[] publicEndpoints = new string[]
+            var publicEndpoints = new[]
             {
                 "/api/login",
                 "/api/register",
@@ -272,7 +271,7 @@ namespace KenshiMultiplayer
             if (client == null) return false;
 
             // Check for auth token in headers
-            string authToken = request.Headers["Authorization"];
+            var authToken = request.Headers["Authorization"];
             if (string.IsNullOrEmpty(authToken)) return false;
 
             // Simple validation - in a real app you'd validate against session store
@@ -285,9 +284,9 @@ namespace KenshiMultiplayer
             return false;
         }
 
-        private void ServeFile(HttpListenerContext context, string filePath)
+        private static void ServeFile(HttpListenerContext context, string filePath)
         {
-            string contentType = GetContentType(filePath);
+            var contentType = GetContentType(filePath);
             byte[] buffer;
 
             try
@@ -320,9 +319,9 @@ namespace KenshiMultiplayer
             }
         }
 
-        private string GetContentType(string filePath)
+        private static string GetContentType(string filePath)
         {
-            string extension = Path.GetExtension(filePath).ToLower();
+            var extension = Path.GetExtension(filePath).ToLower();
 
             return extension switch
             {
@@ -345,9 +344,9 @@ namespace KenshiMultiplayer
 
         private void HandleApiRequest(HttpListenerContext context)
         {
-            string path = context.Request.Url.AbsolutePath;
+            var path = context.Request.Url?.AbsolutePath;
 
-            if (apiEndpoints.ContainsKey(path))
+            if (!string.IsNullOrEmpty(path) && apiEndpoints.ContainsKey(path))
             {
                 try
                 {
@@ -376,7 +375,7 @@ namespace KenshiMultiplayer
             }
         }
 
-        private void SendJsonResponse(HttpListenerContext context, Dictionary<string, object> data, int statusCode = 200)
+        private static void SendJsonResponse(HttpListenerContext context, Dictionary<string, object> data, int statusCode = 200)
         {
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = statusCode;
@@ -395,13 +394,14 @@ namespace KenshiMultiplayer
 
             try
             {
-                string json = JsonSerializer.Serialize(data, new JsonSerializerOptions
+                var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
                 {
                     WriteIndented = true,
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
-                byte[] buffer = Convert.FromBase64String(json);
+                //var buffer = Convert.FromBase64String(json);
+                var buffer = Encoding.UTF8.GetBytes(json);
                 context.Response.ContentLength64 = buffer.Length;
                 context.Response.OutputStream.Write(buffer, 0, buffer.Length);
             }
@@ -415,7 +415,7 @@ namespace KenshiMultiplayer
             }
         }
 
-        private void OnClientMessageReceived(object sender, GameMessage message)
+        private static void OnClientMessageReceived(object sender, GameMessage message)
         {
             // Forward relevant messages to WebUI via WebSocket if implemented
             // For now, just log them
@@ -437,7 +437,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var loginData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -451,8 +451,8 @@ namespace KenshiMultiplayer
                     }
 
                     // Call client login method
-                    bool success = client.Login(
-                        client.ServerAddress ?? request.Url.Host,
+                    var success = client.Login(
+                        client.ServerAddress ?? request.Url?.Host,
                         client.ServerPort > 0 ? client.ServerPort : 5555,
                         loginData["username"],
                         loginData["password"]
@@ -498,7 +498,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var regData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -543,8 +543,8 @@ namespace KenshiMultiplayer
                     }
 
                     // Call client register method
-                    bool success = client.Register(
-                        client.ServerAddress ?? request.Url.Host,
+                    var success = client.Register(
+                        client.ServerAddress ?? request.Url?.Host,
                         client.ServerPort > 0 ? client.ServerPort : 5555,
                         regData["username"],
                         regData["password"],
@@ -587,7 +587,7 @@ namespace KenshiMultiplayer
 
             try
             {
-                string authHeader = request.Headers["Authorization"];
+                var authHeader = request.Headers["Authorization"];
                 if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
                 {
                     string token = authHeader.Substring(7);
@@ -621,7 +621,7 @@ namespace KenshiMultiplayer
 
         private Dictionary<string, object> HandleStatus(HttpListenerRequest request)
         {
-            bool isLoggedIn = client != null && client.IsLoggedIn;
+            var isLoggedIn = client != null && client.IsLoggedIn;
             return new Dictionary<string, object>
             {
                 { "success", true },
@@ -678,7 +678,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var friendData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -691,7 +691,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.SendFriendRequest(friendData["username"]);
+                    var success = client.SendFriendRequest(friendData["username"]);
 
                     return new Dictionary<string, object>
                     {
@@ -722,7 +722,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var friendData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -735,7 +735,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.RemoveFriend(friendData["username"]);
+                    var success = client.RemoveFriend(friendData["username"]);
 
                     return new Dictionary<string, object>
                     {
@@ -766,7 +766,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var friendData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -779,7 +779,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.AcceptFriendRequest(friendData["username"]);
+                    var success = client.AcceptFriendRequest(friendData["username"]);
 
                     return new Dictionary<string, object>
                     {
@@ -810,7 +810,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var friendData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -823,7 +823,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.DeclineFriendRequest(friendData["username"]);
+                    var success = client.DeclineFriendRequest(friendData["username"]);
 
                     return new Dictionary<string, object>
                     {
@@ -854,7 +854,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var friendData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -867,7 +867,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.BlockUser(friendData["username"]);
+                    var success = client.BlockUser(friendData["username"]);
 
                     return new Dictionary<string, object>
                     {
@@ -930,7 +930,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var listingData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -947,10 +947,10 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    string itemId = listingData["itemId"].ToString();
-                    string itemName = listingData["itemName"].ToString();
+                    var itemId = listingData["itemId"].ToString();
+                    var itemName = listingData["itemName"].ToString();
 
-                    if (!int.TryParse(listingData["quantity"].ToString(), out int quantity) || quantity <= 0)
+                    if (!int.TryParse(listingData["quantity"].ToString(), out var quantity) || quantity <= 0)
                     {
                         return new Dictionary<string, object>
                         {
@@ -959,7 +959,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    if (!int.TryParse(listingData["price"].ToString(), out int price) || price <= 0)
+                    if (!int.TryParse(listingData["price"].ToString(), out var price) || price <= 0)
                     {
                         return new Dictionary<string, object>
                         {
@@ -968,14 +968,20 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    float condition = 1.0f;
+                    var condition = 1.0f;
                     if (listingData.ContainsKey("condition") &&
-                        float.TryParse(listingData["condition"].ToString(), out float parsedCondition))
+                        float.TryParse(listingData["condition"].ToString(), out var parsedCondition))
                     {
                         condition = Math.Clamp(parsedCondition, 0.0f, 1.0f);
                     }
 
-                    bool success = client.CreateMarketListing(itemId, itemName, quantity, price, condition);
+                    var success = false;
+                    if(string.IsNullOrEmpty(itemId))
+                        Logger.Log($"Error WebUI: {nameof(itemId)} is null or empty (HandleMarketplaceCreate)");
+                    else if (string.IsNullOrEmpty(itemName))
+                        Logger.Log($"Error WebUI: {nameof(itemName)} is null or empty (HandleMarketplaceCreate)");
+                    else
+                        success = client.CreateMarketListing(itemId, itemName, quantity, price, condition);
 
                     return new Dictionary<string, object>
                     {
@@ -1006,7 +1012,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var purchaseData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -1019,7 +1025,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.PurchaseMarketListing(purchaseData["listingId"]);
+                    var success = client.PurchaseMarketListing(purchaseData["listingId"]);
 
                     return new Dictionary<string, object>
                     {
@@ -1050,7 +1056,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var cancelData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -1063,7 +1069,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.CancelMarketListing(cancelData["listingId"]);
+                    var success = client.CancelMarketListing(cancelData["listingId"]);
 
                     return new Dictionary<string, object>
                     {
@@ -1093,8 +1099,8 @@ namespace KenshiMultiplayer
             try
             {
                 // Get search term from query string
-                string searchTerm = "";
-                if (request.Url.Query.Length > 1)
+                var searchTerm = "";
+                if (request.Url?.Query.Length > 1)
                 {
                     var queryParams = request.Url.Query.TrimStart('?').Split('&');
                     foreach (var param in queryParams)
@@ -1139,7 +1145,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var tradeData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -1152,7 +1158,7 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    bool success = client.InitiateTrade(tradeData["targetUsername"]);
+                    var success = client.InitiateTrade(tradeData["targetUsername"]);
 
                     return new Dictionary<string, object>
                     {
@@ -1183,7 +1189,7 @@ namespace KenshiMultiplayer
             {
                 using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                 {
-                    string jsonStr = reader.ReadToEnd();
+                    var jsonStr = reader.ReadToEnd();
                     var tradeData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonStr,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -1198,11 +1204,11 @@ namespace KenshiMultiplayer
                         };
                     }
 
-                    string action = tradeData["action"].ToString();
-                    string itemId = tradeData["itemId"].ToString();
-                    bool success = false;
+                    var action = tradeData["action"].ToString();
+                    var itemId = tradeData["itemId"].ToString();
+                    var success = false;
 
-                    switch (action.ToLower())
+                    switch (action?.ToLower())
                     {
                         case "add":
                             if (!tradeData.ContainsKey("itemName") ||
@@ -1215,9 +1221,9 @@ namespace KenshiMultiplayer
                                 };
                             }
 
-                            string itemName = tradeData["itemName"].ToString();
+                            var itemName = tradeData["itemName"].ToString();
 
-                            if (!int.TryParse(tradeData["quantity"].ToString(), out int quantity) || quantity <= 0)
+                            if (!int.TryParse(tradeData["quantity"].ToString(), out var quantity) || quantity <= 0)
                             {
                                 return new Dictionary<string, object>
                                 {
@@ -1226,14 +1232,19 @@ namespace KenshiMultiplayer
                                 };
                             }
 
-                            float condition = 1.0f;
+                            var condition = 1.0f;
                             if (tradeData.ContainsKey("condition") &&
-                                float.TryParse(tradeData["condition"].ToString(), out float parsedCondition))
+                                float.TryParse(tradeData["condition"].ToString(), out var parsedCondition))
                             {
                                 condition = Math.Clamp(parsedCondition, 0.0f, 1.0f);
                             }
 
-                            success = client.AddItemToTrade(itemId, itemName, quantity, condition);
+                            if (string.IsNullOrEmpty(itemId))
+                                Logger.Log($"Error WebUI: {nameof(itemId)} is null or empty (HandleTradeUpdate)");
+                            else if (string.IsNullOrEmpty(itemName))
+                                Logger.Log($"Error WebUI: {nameof(itemName)} is null or empty (HandleTradeUpdate)");
+                            else
+                                success = client.AddItemToTrade(itemId, itemName, quantity, condition);
                             break;
 
                         case "remove":
@@ -1258,8 +1269,10 @@ namespace KenshiMultiplayer
                                     { "error", "Quantity must be a positive number" }
                                 };
                             }
-
-                            success = client.UpdateItemQuantity(itemId, updateQuantity);
+                            if (string.IsNullOrEmpty(itemId))
+                                Logger.Log($"Error WebUI: {nameof(itemId)} is null or empty (HandleTradeUpdate)");
+                            else
+                                success = client.UpdateItemQuantity(itemId, updateQuantity);
                             break;
 
                         default:
@@ -1297,7 +1310,7 @@ namespace KenshiMultiplayer
 
             try
             {
-                bool success = client.ConfirmTradeOffer();
+                var success = client.ConfirmTradeOffer();
 
                 return new Dictionary<string, object>
                 {
@@ -1325,7 +1338,7 @@ namespace KenshiMultiplayer
 
             try
             {
-                bool success = client.CancelTrade();
+                var success = client.CancelTrade();
 
                 return new Dictionary<string, object>
                 {
@@ -1397,21 +1410,21 @@ namespace KenshiMultiplayer
                     { "success", true },
                     { "items", new List<Dictionary<string, object>>
                         {
-                            new Dictionary<string, object>
+                            new()
                             {
                                 { "itemId", "item1" },
                                 { "itemName", "Katana" },
                                 { "quantity", 1 },
                                 { "condition", 0.85 }
                             },
-                            new Dictionary<string, object>
+                            new()
                             {
                                 { "itemId", "item2" },
                                 { "itemName", "Dried Meat" },
                                 { "quantity", 5 },
                                 { "condition", 1.0 }
                             },
-                            new Dictionary<string, object>
+                            new()
                             {
                                 { "itemId", "item3" },
                                 { "itemName", "Iron Plates" },
@@ -1530,7 +1543,7 @@ namespace KenshiMultiplayer
             }
         }
 
-        private Dictionary<string, object> HandleGameMods(HttpListenerRequest request)
+        private static Dictionary<string, object> HandleGameMods(HttpListenerRequest request)
         {
             try
             {
@@ -1541,19 +1554,19 @@ namespace KenshiMultiplayer
                     { "success", true },
                     { "mods", new List<Dictionary<string, object>>
                         {
-                            new Dictionary<string, object>
+                            new()
                             {
                                 { "name", "Reactive World" },
                                 { "enabled", true },
                                 { "path", "mods/reactive_world" }
                             },
-                            new Dictionary<string, object>
+                            new()
                             {
                                 { "name", "Kaizo" },
                                 { "enabled", true },
                                 { "path", "mods/kaizo" }
                             },
-                            new Dictionary<string, object>
+                            new()
                             {
                                 { "name", "Dark UI" },
                                 { "enabled", true },
@@ -1583,8 +1596,8 @@ namespace KenshiMultiplayer
 
             try
             {
-                string directory = "";
-                if (request.Url.Query.Length > 1)
+                var directory = "";
+                if (request.Url?.Query.Length > 1)
                 {
                     var queryParams = request.Url.Query.TrimStart('?').Split('&');
                     foreach (var param in queryParams)
@@ -1618,13 +1631,13 @@ namespace KenshiMultiplayer
             }
         }
 
-        private void ExtractEmbeddedWebUI()
+        private void ExtractEmbeddedWebUi()
         {
             // Create basic files if they don't exist
-            string indexPath = Path.Combine(webRoot, "index.html");
-            string stylesPath = Path.Combine(webRoot, "styles.css");
-            string scriptsPath = Path.Combine(webRoot, "scripts");
-            string scriptsMainPath = Path.Combine(scriptsPath, "main.js");
+            var indexPath = Path.Combine(webRoot, "index.html");
+            var stylesPath = Path.Combine(webRoot, "styles.css");
+            var scriptsPath = Path.Combine(webRoot, "scripts");
+            var scriptsMainPath = Path.Combine(scriptsPath, "main.js");
 
             // Create directories if they don't exist
             Directory.CreateDirectory(webRoot);
@@ -3512,7 +3525,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });";
         }
 
-        private bool IsValidEmail(string email)
+        private static bool IsValidEmail(string email)
         {
             try
             {
